@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="app">
+        {{name}}
+    </div>
+</body>
+<script src="./dist/vue.js"></script>
+<script>
+    const vm = new Vue({
+        el: "#app",
+        data() {
+            return {
+                name: '张三',
+                age: '12',
+                gender: '男',
+                son:{
+                    age:'10',
+                    gender: '女',
+                    name: '小红'
+                },
+                arr: [
+                    {age:12,name:'老师'},
+                    {age:11,name:'校长'},
+                ]
+            }
+        }
+    })
+    // 
+    vm.arr.push([{a:1}])
+    console.log('vm.arr',vm.arr)
+
+    // vm.arr[0].name = '学生'
+</script>
+
+</html>
