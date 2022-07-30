@@ -58,8 +58,11 @@ function defineReactive(data, key, value) {
     },
     set(newValue) {
       // 设置的新值有可能还是对象
-      observe(value);
-      value = newValue;
+      if(newValue !== value){
+        observe(value);
+        value = newValue;
+        dep.notify(); // 告诉当前的属性存放的watcher执行
+      }
     },
   });
 }

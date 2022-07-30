@@ -1,4 +1,5 @@
 import { popTarget, pushTarget } from "./dep";
+import { queueWatcher } from "./scheduler";
 
 let id = 0; // 标识，当new Watcher的时候id自增
 class Watcher{
@@ -38,6 +39,16 @@ class Watcher{
         // Dep.target = null; 如果在Dep.target中有值说明在模板中使用了
         // 用户在外面取值的时候不去收集依赖
         popTarget(); 
+    }
+    update() {
+        // this是 watcher
+        // 每次调用update 将watcher缓存起来，之后一起更新
+        // vue中的更新操作是异步的
+        queueWatcher(this);
+    }
+    // run 就是执行了updateComponent方法
+    run(){
+        this.get();
     }
     addDep(dep){
         let id = dep.id;

@@ -35,6 +35,16 @@
             }
         },
     })
+
+    vm.name = 'wd';
+    vm.age = '1';
+    vm.sex = '2';
+    setTimeout(()=>{
+        vm.age = '111';
+    },1111)
+    // vm.$nextTick(()=>{
+    //     console.log(vm.$el) 
+    // })
 </script>
 
 </html>

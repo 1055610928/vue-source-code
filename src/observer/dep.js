@@ -17,6 +17,11 @@ export class Dep{
     addSub(watcher){
         this.subs.push(watcher)
     }
+    notify(){
+        this.subs.forEach(watcher=>{
+            watcher.update(); // 执行get
+        })
+    }
 }
 
 Dep.target = null;

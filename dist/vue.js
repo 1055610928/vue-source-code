@@ -309,6 +309,13 @@
         value: function addSub(watcher) {
           this.subs.push(watcher);
         }
+      }, {
+        key: "notify",
+        value: function notify() {
+          this.subs.forEach(function (watcher) {
+            watcher.update(); // 执行get
+          });
+        }
       }]);
 
       return Dep;
@@ -319,6 +326,98 @@
     }
     function popTarget() {
       Dep.target = null;
+    }
+
+    function isFunction(val) {
+      return typeof val === "function";
+    }
+    function isObject(val) {
+      return _typeof(val) === "object" && val !== null;
+    }
+    var callbacks = [];
+
+    function flushCallback() {
+      callbacks.forEach(function (cb) {
+        return cb();
+      });
+      waiting = false;
+    }
+
+    var waiting = false;
+
+    function timer(flushCallback) {
+      var timerFn = function timerFn() {};
+
+      if (Promise) {
+        timerFn = function timerFn() {
+          Promise.resolve().then(flushCallback);
+        };
+      } else if (MutationObserver) {
+        var textNode = document.createTextNode(1);
+        var observe = new MutationObserver(flushCallback); // 监听内容的变化
+
+        observe.observe(textNode, {
+          characterData: true
+        });
+
+        timerFn = function timerFn() {
+          textNode.textContent = 3;
+        };
+      } else if (setImmediate) {
+        timerFn = function timerFn() {
+          setImmediate(flushCallback);
+        };
+      } else {
+        timerFn = function timerFn() {
+          setTimeout(flushCallback);
+        };
+      }
+
+      timerFn();
+    }
+
+    function nextTick(cb) {
+      callbacks.push(cb);
+
+      if (!waiting) {
+        // vue2考虑了兼容性问题，vue3里面不再考虑兼容性问题
+        timer(flushCallback);
+        waiting = true;
+      }
+    }
+
+    var queue = [];
+    var has = {}; // 做列表的。列表的维护存放了哪些watcher
+
+    function flushSchedulerQeue() {
+      for (var i = 0; i < queue.length; i++) {
+        queue[i].run(); // 清空队列
+
+        queue = [];
+        has = {};
+        pending = false;
+      }
+    }
+
+    var pending = false; // 等待同步代码执行完毕以后，才执行异步逻辑
+    // 当前执行栈中代码执行完毕后，会先清空微任务，再清空宏任务
+    // 尽早更新页面，$nextTicket
+
+    function queueWatcher(watcher) {
+      // 这里watcher进行一次去重，这里每个属性都有一个dep,
+      // dep里又有watcher，所以多次更新操作的时候watcher可能是同一个，要进行去重
+      var id = watcher.id;
+
+      if (!has[id]) {
+        queue.push(watcher);
+        has[id] = true; // 开启一次更新操作，多次触发queueWatcher 只触发一次nextTick(flushSchedulerQeue)
+        // 如果是同步：可能进来不同的watcher，那么可不止一次调用 nextTick(flushSchedulerQeue)
+
+        if (!pending) {
+          nextTick(flushSchedulerQeue);
+          pending = true;
+        }
+      }
     }
 
     var id = 0; // 标识，当new Watcher的时候id自增
@@ -364,6 +463,20 @@
           // 用户在外面取值的时候不去收集依赖
 
           popTarget();
+        }
+      }, {
+        key: "update",
+        value: function update() {
+          // this是 watcher
+          // 每次调用update 将watcher缓存起来，之后一起更新
+          // vue中的更新操作是异步的
+          queueWatcher(this);
+        } // run 就是执行了updateComponent方法
+
+      }, {
+        key: "run",
+        value: function run() {
+          this.get();
         }
       }, {
         key: "addDep",
@@ -424,7 +537,10 @@
         // vnode 利用虚拟节点创建真实节点，替换 $el 中的内容
         var vm = this;
         vm.$el = patch(vm.$el, vnode); // console.log(vm,vnode)
-      };
+      }; // nextTick
+
+
+      Vue.prototype.$nextTick = nextTick;
     } // 后续每个组件渲染的时候都会有一个watcher
 
     function mountComponent(vm, el) {
@@ -445,13 +561,6 @@
       new Watcher(vm, updateComponent, function () {
         console.log("更新视图了");
       }, true); // true这个标识是代表它是一个渲染watcher, 后续有其它的Watcher
-    }
-
-    function isFunction(val) {
-      return typeof val === "function";
-    }
-    function isObject(val) {
-      return _typeof(val) === 'object' && val !== null;
     }
 
     // Objec.create 模拟
@@ -572,8 +681,11 @@
         },
         set: function set(newValue) {
           // 设置的新值有可能还是对象
-          observe(value);
-          value = newValue;
+          if (newValue !== value) {
+            observe(value);
+            value = newValue;
+            dep.notify(); // 告诉当前的属性存放的watcher执行
+          }
         }
       });
     }
