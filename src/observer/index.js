@@ -1,5 +1,6 @@
 import { isObject } from "../utils";
 import { arrayMethods } from "./array";
+import { Dep } from "./dep";
 
 class Observer {
   constructor(data) {
@@ -41,15 +42,18 @@ class Observer {
     });
   }
 }
-// vue 会对对象进行遍历，将每个属性 用Object.defineProperty 重新定义，所以性能不好
-// 以下的definedReactive是一个闭包，每个属性定义完成以后会在实例上定义上get xxx和set xxx
-// 所以defineReactive执行完毕之后 Object.definedProperty的get/set带着defineReactive的AO
+
 function defineReactive(data, key, value) {
-  // value有可能还是对象
   observe(value);
+  let dep = new Dep(); // 每个属性都会有自己的dep
   Object.defineProperty(data, key, {
     get() {
-      // console.log('getter',value)
+      // watcher和 Dep 对应
+      // Dep.target 如果有值说明用户在模板中取值了
+      if(Dep.target){
+        // 让dep记住watcher
+        dep.depend()
+      }
       return value;
     },
     set(newValue) {

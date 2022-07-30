@@ -10,7 +10,8 @@
 
 <body>
     <div id="app">
-        {{name}}
+        hello {{name}} word {{name}}
+        hi {{age}} 你好 {{arr}}
     </div>
 </body>
 <script src="./dist/vue.js"></script>
@@ -22,23 +23,18 @@
                 name: '张三',
                 age: '12',
                 gender: '男',
-                son:{
-                    age:'10',
+                son: {
+                    age: '10',
                     gender: '女',
                     name: '小红'
                 },
                 arr: [
-                    {age:12,name:'老师'},
-                    {age:11,name:'校长'},
+                    { age: 12, name: '老师' },
+                    { age: 11, name: '校长' },
                 ]
             }
-        }
+        },
     })
-    // 
-    vm.arr.push([{a:1}])
-    console.log('vm.arr',vm.arr)
-
-    // vm.arr[0].name = '学生'
 </script>
 
 </html>

@@ -1,11 +1,11 @@
-var arr = {
-  a: {
-    b: [],
-    c: {
-      fn() {
-        console.log(this);
-      },
-    },
-  },
+var obj = {
+  a: 1,
 };
-arr.a.c.fn(); // this指向c
+Object.defineProperty(obj,'a',{
+  get(){
+    console.log('gets')
+    return 1
+  }
+});
+
+console.log(JSON.stringify(obj))
