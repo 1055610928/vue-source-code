@@ -24,7 +24,6 @@ let root = null; //树根
 let stack = [];
 // 开始标签
 function start(tagName, attributes) {
-//   console.log(tagName, attributes);
   let parent = stack[stack.length - 1];
   let element = createAstElement(tagName, attributes);
   if (!root) {

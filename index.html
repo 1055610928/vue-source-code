@@ -10,41 +10,30 @@
 
 <body>
     <div id="app">
-        hello {{name}} word {{name}}
-        hi {{age}} 你好 {{arr}}
+       {{name}}
     </div>
 </body>
 <script src="./dist/vue.js"></script>
+<!-- <script src="./node_modules/vue/dist/vue.js"></script> -->
 <script>
     const vm = new Vue({
         el: "#app",
-        data() {
-            return {
-                name: '张三',
-                age: '12',
-                gender: '男',
-                son: {
-                    age: '10',
-                    gender: '女',
-                    name: '小红'
-                },
-                arr: [
-                    { age: 12, name: '老师' },
-                    { age: 11, name: '校长' },
-                ]
-            }
+        data:{
+            name:"zf",
+        },
+        watch: {
+            name:[function(newVal,oldVal){
+                // console.log(newVal,oldVal);
+
+            },function(newVal,oldVal){
+                // console.log(newVal,oldVal);
+                // this.name = '哈哈哈'
+            }],
         },
     })
-
-    vm.name = 'wd';
-    vm.age = '1';
-    vm.sex = '2';
     setTimeout(()=>{
-        vm.age = '111';
-    },1111)
-    // vm.$nextTick(()=>{
-    //     console.log(vm.$el) 
-    // })
+        vm.name = '哈哈'
+    })
 </script>
 
 </html>

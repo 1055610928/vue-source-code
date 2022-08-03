@@ -13,11 +13,30 @@ class Watcher{
     constructor(vm,exprOrfn,cb,options){
         this.vm = vm;
         this.exprOrfn = exprOrfn;
+        // 看是不是用户watcher
+        this.user = !!options.user
         this.cb = cb;
         this.options = options;
-        // 默认让exprOrfn默认执行
-        // exprOrFn 调用了render方法，要去vm上取值
-        this.getter = exprOrfn
+        // 判断是不是一个函数？有可能是一个key值
+        if(typeof exprOrfn === 'string'){
+            // 需要将key值转换成函数
+            this.getter = function(){
+                // 当数据取值的时候会进行依赖收集
+                // 会走对应的getter---> 走了getter就会进行依赖收集
+                // 用户有可能使用 'age.n'---> 这种方式定义watch中的处理函数--->需要变成this.vm['age']['n']
+                const path = exprOrfn.split('.')
+                let obj = vm;
+                for (let i = 0; i < path.length; i++) {
+                    obj = obj[path[i]];
+                }
+                return obj; 
+            }
+        }else{
+            // 默认让exprOrfn默认执行
+            // exprOrFn 调用了render方法，要去vm上取值
+            this.getter = exprOrfn
+        }
+
         this.id = id++;
 
         // 存放dep
@@ -25,7 +44,8 @@ class Watcher{
         this.depsId = new Set();
 
         // 默认初始化要取值
-        this.get();
+        // 第一次的value
+        this.value = this.get();
     }
     // 稍后用户更新的时候重新调用get方法
     get(){ 
@@ -33,12 +53,16 @@ class Watcher{
         // 一个属性可以对应多个watcher, 同时一个watcher对应多个属性
         // 为什么是多对多？ 一个属性可能在多个组件中使用(只要这个属性一变，这多个组件都要更新)，
         // 一个组件可能有多个属性
-        pushTarget(this); // Dep.target = Watcher
-        this.getter(); // 执行这句话的时候会执行render, render会去vm实例上取值
+        // Dep.target = Watcher
+        pushTarget(this); 
 
+        // 执行这句话的时候会执行render, render会去vm实例上取值
+        //用户watcher: 第一次执行的时候会返回value, 等到set的时候又会走get返回新的值
+        const value = this.getter();
         // Dep.target = null; 如果在Dep.target中有值说明在模板中使用了
         // 用户在外面取值的时候不去收集依赖
         popTarget(); 
+        return value
     }
     update() {
         // this是 watcher
@@ -48,7 +72,15 @@ class Watcher{
     }
     // run 就是执行了updateComponent方法
     run(){
-        this.get();
+        // 新值
+        let newVal = this.get();
+        // 老值
+        let oldVal = this.value 
+        this.value = newVal // 为了保证下一次更新的时候，上一次的最新值是下一次的老值
+        if(this.user){
+            // 是用户watcher才会调用watch中的函数
+            this.cb.call(this.vm, newVal,oldVal)
+        }
     }
     addDep(dep){
         let id = dep.id;

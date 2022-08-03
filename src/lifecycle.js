@@ -9,7 +9,6 @@ export function lifecycleMixin(Vue){
         // vnode 利用虚拟节点创建真实节点，替换 $el 中的内容
         const vm = this;
         vm.$el = patch(vm.$el, vnode)
-        // console.log(vm,vnode)
     }
     // nextTick
     Vue.prototype.$nextTick = nextTick

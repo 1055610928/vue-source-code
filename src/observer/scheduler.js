@@ -6,12 +6,11 @@ let has = {}; // 做列表的。列表的维护存放了哪些watcher
 function flushSchedulerQeue() {
   for (let i = 0; i < queue.length; i++) {
     queue[i].run();
-
-    // 清空队列
-    queue = [];
-    has = {};
-    pending = false;
   }
+  // 清空队列,数据更新后保证只更新一次视图
+  queue = [];
+  has = {};
+  pending = false;
 }
 
 let pending = false;

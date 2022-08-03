@@ -122,7 +122,6 @@
     var stack = []; // 开始标签
 
     function start(tagName, attributes) {
-      //   console.log(tagName, attributes);
       var parent = stack[stack.length - 1];
       var element = createAstElement(tagName, attributes);
 
@@ -391,12 +390,13 @@
 
     function flushSchedulerQeue() {
       for (var i = 0; i < queue.length; i++) {
-        queue[i].run(); // 清空队列
+        queue[i].run();
+      } // 清空队列,数据更新后保证只更新一次视图
 
-        queue = [];
-        has = {};
-        pending = false;
-      }
+
+      queue = [];
+      has = {};
+      pending = false;
     }
 
     var pending = false; // 等待同步代码执行完毕以后，才执行异步逻辑
@@ -434,18 +434,40 @@
         _classCallCheck(this, Watcher);
 
         this.vm = vm;
-        this.exprOrfn = exprOrfn;
-        this.cb = cb;
-        this.options = options; // 默认让exprOrfn默认执行
-        // exprOrFn 调用了render方法，要去vm上取值
+        this.exprOrfn = exprOrfn; // 看是不是用户watcher
 
-        this.getter = exprOrfn;
+        this.user = !!options.user;
+        this.cb = cb;
+        this.options = options; // 判断是不是一个函数？有可能是一个key值
+
+        if (typeof exprOrfn === 'string') {
+          // 需要将key值转换成函数
+          this.getter = function () {
+            // 当数据取值的时候会进行依赖收集
+            // 会走对应的getter---> 走了getter就会进行依赖收集
+            // 用户有可能使用 'age.n'---> 这种方式定义watch中的处理函数--->需要变成this.vm['age']['n']
+            var path = exprOrfn.split('.');
+            var obj = vm;
+
+            for (var i = 0; i < path.length; i++) {
+              obj = obj[path[i]];
+            }
+
+            return obj;
+          };
+        } else {
+          // 默认让exprOrfn默认执行
+          // exprOrFn 调用了render方法，要去vm上取值
+          this.getter = exprOrfn;
+        }
+
         this.id = id++; // 存放dep
 
         this.deps = [];
         this.depsId = new Set(); // 默认初始化要取值
+        // 第一次的value
 
-        this.get();
+        this.value = this.get();
       } // 稍后用户更新的时候重新调用get方法
 
 
@@ -456,13 +478,15 @@
           // 一个属性可以对应多个watcher, 同时一个watcher对应多个属性
           // 为什么是多对多？ 一个属性可能在多个组件中使用(只要这个属性一变，这多个组件都要更新)，
           // 一个组件可能有多个属性
-          pushTarget(this); // Dep.target = Watcher
+          // Dep.target = Watcher
+          pushTarget(this); // 执行这句话的时候会执行render, render会去vm实例上取值
+          //用户watcher: 第一次执行的时候会返回value, 等到set的时候又会走get返回新的值
 
-          this.getter(); // 执行这句话的时候会执行render, render会去vm实例上取值
-          // Dep.target = null; 如果在Dep.target中有值说明在模板中使用了
+          var value = this.getter(); // Dep.target = null; 如果在Dep.target中有值说明在模板中使用了
           // 用户在外面取值的时候不去收集依赖
 
           popTarget();
+          return value;
         }
       }, {
         key: "update",
@@ -476,7 +500,16 @@
       }, {
         key: "run",
         value: function run() {
-          this.get();
+          // 新值
+          var newVal = this.get(); // 老值
+
+          var oldVal = this.value;
+          this.value = newVal; // 为了保证下一次更新的时候，上一次的最新值是下一次的老值
+
+          if (this.user) {
+            // 是用户watcher才会调用watch中的函数
+            this.cb.call(this.vm, newVal, oldVal);
+          }
         }
       }, {
         key: "addDep",
@@ -536,7 +569,7 @@
         // patch： diff流程
         // vnode 利用虚拟节点创建真实节点，替换 $el 中的内容
         var vm = this;
-        vm.$el = patch(vm.$el, vnode); // console.log(vm,vnode)
+        vm.$el = patch(vm.$el, vnode);
       }; // nextTick
 
 
@@ -563,18 +596,10 @@
       }, true); // true这个标识是代表它是一个渲染watcher, 后续有其它的Watcher
     }
 
-    // Objec.create 模拟
-    // function ObjectCreate(proto){
-    //     function F(){}
-    //     F.prototype = proto
-    //     return new F();
-    // }
     var oldArrayPrototype = Array.prototype;
-    var arrayMethods = Object.create(Array.prototype); // arrayMethods.__proto__ = Array.prototype // 就是个继承
-
+    var arrayMethods = Object.create(Array.prototype);
     var methods = ["push", "pop", "shift", "unshift", "reverse", "sort", "splice"];
     methods.forEach(function (method) {
-      // 用户调用的是以上的7个方法，会用我自己重写的，否则会用原来的
       arrayMethods[method] = function () {
         var _oldArrayPrototype$me;
 
@@ -582,13 +607,10 @@
           args[_key] = arguments[_key];
         }
 
-        // 相当于调用原来的push, this --> 谁调用就指向谁
-        (_oldArrayPrototype$me = oldArrayPrototype[method]).call.apply(_oldArrayPrototype$me, [this].concat(args)); // args就是新增的内容
-        // push splice unshift
-
+        (_oldArrayPrototype$me = oldArrayPrototype[method]).call.apply(_oldArrayPrototype$me, [this].concat(args));
 
         var inserted;
-        var ob = this.__ob__; // 这里获取的就是Observer实例
+        var ob = this.__ob__;
 
         switch (method) {
           case "push":
@@ -602,59 +624,52 @@
           case "unshift":
             inserted = args;
             break;
-        } // 如果有新增的内容，继续进行劫持
-        // 需要观测数组中的每一项，而不是数组，
-        // this是那个数组，index.js文件中的也是那个数组
-
+        }
 
         if (inserted) {
           ob.observeArray(inserted);
-        }
+        } // ob.dep 就是observer实例 
+
+
+        ob.dep.notify();
       };
     });
+
+    // 如果增加一个属性后，就手动触发watcher更新)
 
     var Observer = /*#__PURE__*/function () {
       function Observer(data) {
         _classCallCheck(this, Observer);
 
-        // this指向Observer实例
-        // data.__ob__ 等于当前的Observer实例
-        // 所有被劫持的属性都有__ob__
-        // data.__ob__ 在这里会被不停的观测
-        // 将data.__ob__ 变成不可枚举的属性
-        data.__ob__ = this;
+        data.__ob__ = this; // 给Observer实例添加dep属性
+
+        this.dep = new Dep(); // 数据可能是数组可能是对象
+
         Object.defineProperty(data, '__ob__', {
           value: this,
           enumerable: false
         });
 
         if (Array.isArray(data)) {
-          // 数组劫持的逻辑，对数组原来的方法进行改写，切片编程
-          // console.log(arrayMethods) // Object.create(Array.prototype)
-          // 如果数组中的数据是对象类型，需要监控对象的变化
-          data.__proto__ = arrayMethods; // 数组中的对象进行劫持
-
+          // 数组的变化触发视图更新？
+          data.__proto__ = arrayMethods;
           this.observeArray(data);
         } else {
-          // 对象劫持的逻辑
           this.walk(data);
         }
-      } // 数组观测
-
+      }
 
       _createClass(Observer, [{
         key: "observeArray",
         value: function observeArray(data) {
-          // 对数组中数组 或者是 数组中的对象再次劫持，递归
+          // 如果数组里面是对象类型，也做了观测， JSON.stringfy() 也做了收集依赖
           data.forEach(function (item) {
             observe(item);
           });
-        } // walk --> 走，步行
-
+        }
       }, {
         key: "walk",
         value: function walk(data) {
-          // Object.keys不会遍历到原型链，取到的都是私有属性
           Object.keys(data).forEach(function (key) {
             defineReactive(data, key, data[key]);
           });
@@ -662,19 +677,39 @@
       }]);
 
       return Observer;
-    }();
+    }(); // 数组套数组，进行依赖收集
+
+
+    function dependArray(value) {
+      for (var i = 0; i < value.length; i++) {
+        var currentArray = value[i];
+        currentArray.__ob__ && currentArray.__ob__.dep.depend(); // 多维数组
+
+        if (Array.isArray(currentArray)) {
+          dependArray(currentArray);
+        }
+      }
+    }
 
     function defineReactive(data, key, value) {
-      observe(value);
-      var dep = new Dep(); // 每个属性都会有自己的dep
-
+      // childOb 获取的就是Observer实例，Observer实例身上有dep实例，dep在getter的时候收集依赖
+      var childOb = observe(value);
+      var dep = new Dep();
       Object.defineProperty(data, key, {
         get: function get() {
-          // watcher和 Dep 对应
-          // Dep.target 如果有值说明用户在模板中取值了
           if (Dep.target) {
-            // 让dep记住watcher
-            dep.depend();
+            dep.depend(); // childOb可能是数组可能是对象，对象也要收集依赖，后续写$set方法的时候需要触发它自己的更新操作
+
+            if (childOb) {
+              // childOb存的是Observer实例，Observer身上有dep属性, 数组和对象都记录watcher
+              // dep.depend收集watcher, 当数组更新的时候, dep.notify()通知watcher更新视图
+              // 这里只是收集依赖只是收集了最外层的数组
+              childOb.dep.depend(); // 数组套数组的情况, 多维数组的情况也要进行依赖收集
+
+              if (Array.isArray(value)) {
+                dependArray(value);
+              }
+            }
           }
 
           return value;
@@ -697,13 +732,29 @@
 
 
       if (data.__ob__) {
-        return;
+        return data.__ob__;
       } // 创建一个观测者
 
 
       return new Observer(data);
     }
 
+    function stateMxin(Vue) {
+      Vue.prototype.$watch = function (key, handler) {
+        var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+        options.user = true; // 用户自己写的watcher, 要和渲染watcher区分开
+        // vm,exprOrfn,cb,options
+
+        var vm = this; // vm, name, 用户回调, options.user
+
+        var watcher = new Watcher(vm, key, handler, options); // 看是不是立即执行，是则直接调用handler 返回watcher中的value,
+        // 第一次执行只有新值
+
+        if (options.immediate) {
+          handler(watcher.value);
+        }
+      };
+    }
     function initState(vm) {
       // 状态的初始化
       var options = vm.$options; // props在data之前
@@ -718,10 +769,13 @@
 
       if (options.computed) ;
 
-      if (options.watch) ;
+      if (options.watch) {
+        // 用户有watch的时候初始化watch
+        initWatch(vm, options.watch);
+      }
     }
     /**
-     * 
+     *
      * @param {*} vm vue实例
      * @param {*} target 去哪里取值
      * @param {*} key key值
@@ -744,11 +798,33 @@
       data = vm._data = isFunction(data) ? data.call(this) : data; // 代理取值
 
       for (var key in data) {
-        proxy(vm, '_data', key);
+        proxy(vm, "_data", key);
       } // 数据观测
 
 
       observe(data);
+    } // 初始化watch
+
+
+    function initWatch(vm, watch) {
+      for (var key in watch) {
+        var handler = watch[key];
+
+        if (Array.isArray(handler)) {
+          // 看是不是数组
+          for (var i = 0; i < handler.length; i++) {
+            // handler[i] // 每一个handler函数
+            createWatcher(vm, key, handler[i]);
+          }
+        } else {
+          // handler  // hander函数
+          createWatcher(vm, key, handler);
+        }
+      }
+    }
+
+    function createWatcher(vm, key, handler) {
+      return vm.$watch(key, handler);
     }
 
     function initMixin(Vue) {
@@ -871,6 +947,8 @@
     renderMixin(Vue); // _render
 
     lifecycleMixin(Vue); // _update
+
+    stateMxin(Vue); // 状态混入
 
     return Vue;
 
