@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>webComponent</title>
+</head>
+
+<body>
+    <xl-button type="primary">美丽的button</xl-button>
+    <!-- 浏览器提供：不会被渲染到视图上，不会影响到页面的展示，可以使用模板 -->
+    <template id="btn">
+        <button class="xl-button">
+            <slot>默认按钮</slot>
+        </button>
+    </template>
+</body>
+<script>
+    class XLButton extends HTMLElement{
+        constructor(){
+            super()
+            // 增加影子DOM
+            const shadow = this.attachShadow({
+                mode:'open' // 外面可以看到我的DOM
+            })
+            const btnTemplate = document.getElementById("btn")
+            const style = document.createElement("style");
+            const type = this.getAttribute("type") || 'default'
+            const btnList = {
+                'primary':{
+                    baclground:'#409eff',
+                    color:"#fff"
+                },
+                'default':{
+                    baclground:'#909399',
+                    color:"#fff"
+                }
+            }
+
+            style.textContent = `
+                .xl-button{
+                    outline: none;
+                    border: none;
+                    border-radius: 4px;
+                    padding:5px 20px;
+                    display:inline-flex;
+                    background:${btnList[type].baclground};
+                    color:${btnList[type].color};
+                }
+            `
+            const cloneTarget = btnTemplate.content.cloneNode(true);
+            // DOM操作具备移动性
+            shadow.appendChild(cloneTarget);
+            shadow.appendChild(style);
+        }
+    }
+    // 定义了一个自定义的标签
+    window.customElements.define('xl-button',XLButton)
+</script>
+</html>

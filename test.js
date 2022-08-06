@@ -1,18 +1,11 @@
-let obj = {
-  "a.b.c.d": 2,
-};
-let obj1  = {
-  a: {
-    b: {
-      c: {
-        d: 2,
-      },
-    },
-  },
+const obj1 = {
+  a: 1,
+  b:2
 }
-let keys = Object.keys(obj)[0];
-const path = keys.split(".");
-for (let i = 0; i < path.length; i++) {
-  obj1 = obj1[path[i]];
-  console.log(obj1)
+const obj2 = {
+  a:2,
+  c:3
 }
+
+const res = Object.assign(obj1,obj2);
+console.log(res)

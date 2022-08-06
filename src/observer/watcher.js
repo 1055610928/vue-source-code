@@ -17,6 +17,14 @@ class Watcher{
         this.user = !!options.user
         this.cb = cb;
         this.options = options;
+
+        // 看options上有没有lazy属性
+        this.lazy = !!options.lazy;
+        // computed脏值检查
+        // 如果是计算属性，那么默认值lazy为true,dirty也为true
+        this.dirty = options.lazy; 
+
+
         // 判断是不是一个函数？有可能是一个key值
         if(typeof exprOrfn === 'string'){
             // 需要将key值转换成函数
@@ -45,7 +53,9 @@ class Watcher{
 
         // 默认初始化要取值
         // 第一次的value
-        this.value = this.get();
+        // this.lazy表示式计算属性，默认不执行getter
+        this.value = this.lazy ? undefined : this.get();
+        // console.log(this.lazy,this.getter)
     }
     // 稍后用户更新的时候重新调用get方法
     get(){ 
@@ -58,6 +68,7 @@ class Watcher{
 
         // 执行这句话的时候会执行render, render会去vm实例上取值
         //用户watcher: 第一次执行的时候会返回value, 等到set的时候又会走get返回新的值
+        // computed在这里收集watcher的时候是收集的计算属性watcher
         const value = this.getter();
         // Dep.target = null; 如果在Dep.target中有值说明在模板中使用了
         // 用户在外面取值的时候不去收集依赖
@@ -65,10 +76,15 @@ class Watcher{
         return value
     }
     update() {
-        // this是 watcher
-        // 每次调用update 将watcher缓存起来，之后一起更新
-        // vue中的更新操作是异步的
-        queueWatcher(this);
+        // this.lazy=true 代表是计算属性watcher
+        if(this.lazy){
+            this.dirty = true
+        }else{
+            // this是 watcher
+            // 每次调用update 将watcher缓存起来，之后一起更新
+            // vue中的更新操作是异步的
+            queueWatcher(this);
+        }
     }
     // run 就是执行了updateComponent方法
     run(){
@@ -89,6 +105,18 @@ class Watcher{
             this.depsId.add(id);
             this.deps.push(dep);
             dep.addSub(this);
+        }
+    }
+    evaludate(){
+        // 求值的时候将dirty变成false, 代表已经取过值了  
+        this.dirty = false; // 取值之后就不脏了，缓存起来
+        this.value = this.get(); // 用户的getter执行
+    }
+    depend(){
+        let len = this.deps.length;
+        while (len--) {
+            // 让lastName和firstName收集渲染Watcher
+            this.deps[len].depend(); 
         }
     }
 }

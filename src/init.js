@@ -1,16 +1,24 @@
 import { compilerToFunction } from "./compiler/index";
-import { mountComponent } from "./lifecycle";
+import { callHook, mountComponent } from "./lifecycle";
 import { initState } from "./state";
+import { mergeOptions } from './utils'
 
 // 表示在vue的基础上做一次混合的操作
 export function initMixin(Vue) {
   Vue.prototype._init = function (options) {
     // el 和 data
     const vm = this;
-    vm.$options = options; // 后续对options进行扩展
+
+    // 谁调用就指向谁的构造器
+    vm.$options = mergeOptions(vm.constructor.options, options); // 后续对options进行扩展
+    // 数据初始化之前调用beforeCreated
+    callHook(vm,'beforeCreate'); 
 
     // 对数据进行初始化 watch,props,computed,data ...
     initState(vm); // vm.$options.data  vm.$options.computed ...
+
+    // 数据初始化之后执行created方法
+    callHook(vm,'created');
 
     // 看用户的实例上有没有el这样的属性
     // 有el属性就调用 vm.$mount
@@ -37,11 +45,11 @@ export function initMixin(Vue) {
       if (!template && el) {
         // 用户没有传递template就取el的内容作为模板
         template = el.outerHTML;
-        const render = compilerToFunction(template)
-        // options.render就是渲染函数
-        // 谁调用render render中的 with(this) 就指向谁
-        options.render = render
       }
+      const render = compilerToFunction(template)
+      // options.render就是渲染函数
+      // 谁调用render render中的 with(this) 就指向谁
+      options.render = render
     }
     // options.render就是渲染函数
     // 调用render方法，最终渲染成真实DOM，替换掉页面的内容

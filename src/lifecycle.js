@@ -26,6 +26,10 @@ export function mountComponent(vm, el) {
     // 什么是挂载？
     // 根据render方法生成DOM元素，将id=app里面的内容替换掉，这就叫挂载 
 
+// 视图调用之前
+callHook(vm,'beforeMount')
+
+
     // 默认会调用一次
     // 组件挂载的时候会执行此方法
     // 属性是被观察者，属性变了通知视图更新
@@ -33,4 +37,17 @@ export function mountComponent(vm, el) {
     new Watcher(vm,updateComponent,()=>{
         console.log("更新视图了")
     },true) // true这个标识是代表它是一个渲染watcher, 后续有其它的Watcher
+
+    // dom已经挂载
+    callHook(vm,'mounted');
+}
+
+// 钩子函数的调用
+export function callHook(vm,hook){
+    const handlers = vm.$options[hook];
+    if(handlers){
+        for (let i = 0; i < handlers.length; i++) {
+            handlers[i].call(vm);            
+        }
+    }
 }

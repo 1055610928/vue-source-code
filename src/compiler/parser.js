@@ -9,7 +9,10 @@ const attribute =
 const startTagClose = /^\s*(\/?)>/; // 匹配标签结束的  />    >
 const defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{   xxx  }}
 
-// 构造AST语法树
+// html = <div id="app"></div>
+export function parseHTML(html) {
+
+  // 构造AST语法树
 function createAstElement(tagName, attrs) {
   return {
     tag: tagName,
@@ -55,8 +58,7 @@ function text(text) {
   }
 }
 
-// html = <div id="app"></div>
-export function parseHTML(html) {
+
   // 前进方法
   function advance(len) {
     html = html.substring(len);

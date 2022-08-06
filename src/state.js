@@ -1,3 +1,4 @@
+import { Dep } from "./observer/dep";
 import { observe } from "./observer/index";
 import Watcher from "./observer/watcher";
 import { isFunction } from "./utils";
@@ -31,6 +32,7 @@ export function initState(vm) {
     initData(vm);
   }
   if (options.computed) {
+    initComputed(vm,options.computed)
   }
 
   if (options.watch) {
@@ -87,4 +89,58 @@ function initWatch(vm, watch) {
 
 function createWatcher(vm,key,handler) {
   return vm.$watch(key,handler)
+}
+
+
+// 初始化computed
+function initComputed(vm,computed){ 
+  const watcher = vm._computedWatchers = {}
+  for (const key in computed) {
+    // userDefine 这里取到的值有可能是对象有可能是函数
+    const userDefine = computed[key];
+    // 依赖的属性变化了就重新取值 (get)
+    let getter = typeof userDefine === 'function'? userDefine : userDefine.get
+    // 每个计算属性本质就是watcher
+    // lazy:true 表示默认不执行 (computed中的函数默认不执行)
+    // watcher[key] 每个属性对应一个watcher, watcher和属性 做一个映射
+    // computed中有多少个计算属性，就有多少个watcher
+    watcher[key] = new Watcher(vm,getter.bind(vm),()=>{},{lazy:true })
+    // 将key 定义在vm上
+    definedComputed(vm,key,userDefine)
+  }
+}
+
+function definedComputed(vm,key,userDefine){
+  let sharedProperty = {}
+  // 判断userDefine是不是一个函数，
+  // userDefine表示computed中定义的计算属性可能是函数，可能是对象
+  if(typeof userDefine === 'function'){
+    sharedProperty.get = userDefine
+  }else{
+    sharedProperty.get = createComputedGetter(key);
+    sharedProperty.set = userDefine.set || (()=>{});
+  }
+  // computed就是一个defineProperty
+  Object.defineProperty(vm,key, sharedProperty)
+}
+
+function createComputedGetter(key){
+  // 取计算属性的值走的是这个函数
+  return function computedGetter(){
+    // this._computedWatchers包含所有的计算属性
+    // 通过key可以拿到对应的watcher
+    let watcher = this._computedWatchers[key]
+    if(watcher.dirty){ // 根据diry属性，来判断是否需要重新求值
+      // 如果这个 watcher.dirty 是脏的，就取一次值
+      watcher.evaludate();
+    } 
+    // 如果当前取完值后，Dep.target还有值 需要继续向上收集
+    if(Dep.target){
+      // 让当前的计算属性也做一次依赖收集，Watcher里对应了多个dep
+      // 计算属性watcher内部有两个dep，firstName和lastName
+      watcher.depend(); 
+    }
+    // 缓存的值
+    return watcher.value
+  }
 }

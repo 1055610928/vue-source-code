@@ -25,9 +25,13 @@ export class Dep{
 }
 
 Dep.target = null;
+var stack = []
 export function pushTarget(wathcer){
     Dep.target = wathcer;
+    stack.push(wathcer)
 }
 export function popTarget(){
-    Dep.target = null
+    // Dep.target = null
+    stack.pop();
+    Dep.target = stack[stack.length - 1];
 }
